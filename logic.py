@@ -318,44 +318,51 @@ def load_database(progress_callback=None):
     db = {"阿丹哥": {}, "開源": {}}
     total = 0 # Initialize here to prevent UnboundLocalError
     
-    try:
-        client = get_gcs_client()
-        bucket = client.bucket(BUCKET_NAME)
-        prefixes = ["阿丹哥/", "開源/"]
+    # Rebuild if no cache or empty cache
+    db = {"阿丹哥": {}, "開源": {}}
+    total = 0 
+    
+    # Don't silence errors here; let main.py catch them
+    client = get_gcs_client()
+    bucket = client.bucket(BUCKET_NAME)
+    prefixes = ["阿丹哥/", "開源/"]
+    
+    for prefix in prefixes:
+        blobs = bucket.list_blobs(prefix=prefix)
+        client_name = prefix.strip("/")
         
-        for prefix in prefixes:
-            blobs = bucket.list_blobs(prefix=prefix)
-            client_name = prefix.strip("/")
-            
-            for blob in blobs:
-                if blob.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp')):
-                    try:
-                        safe_name = urllib.parse.quote(blob.name)
-                        public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{safe_name}"
-                        
-                        # Download once at startup
-                        resp = requests.get(public_url, timeout=10)
-                        if resp.status_code != 200: continue
+        for blob in blobs:
+            if blob.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp')):
+                try:
+                    safe_name = urllib.parse.quote(blob.name)
+                    public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{safe_name}"
+                    
+                    # Download once at startup
+                    resp = requests.get(public_url, timeout=10)
+                    if resp.status_code != 200: continue
 
-                        img = Image.open(io.BytesIO(resp.content))
+                    img = Image.open(io.BytesIO(resp.content))
+                    
+                    # Compute Signature (Hash + Hist)
+                    sig = compute_image_signature(img)
+                    
+                    db[client_name][public_url] = sig
+                    total += 1
+                    
+                    if progress_callback:
+                        progress_callback(total)
                         
-                        # Compute Signature (Hash + Hist)
-                        sig = compute_image_signature(img)
-                        
-                        db[client_name][public_url] = sig
-                        total += 1
-                        
-                        if progress_callback:
-                            progress_callback(total)
-                            
-                    except Exception as e:
-                        pass
-        
-        # Save cache after rebuild
+                except Exception as e:
+                    print(f"Error processing {blob.name}: {e}")
+                    pass
+    
+    # Only save cache if we actually found something
+    if total > 0:
         save_index_cache(db)
-        
-    except Exception as e:
-        print(f"GCS Setup Error: {e}")
+    else:
+        print("Warning: Rebuild found 0 images. Not saving empty cache.")
+
+    return db, total
         
     return db, total
 
