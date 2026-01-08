@@ -304,12 +304,17 @@ def load_database(progress_callback=None):
     # Try Cache First
     cached_db = load_index_cache()
     if cached_db:
-        # Calculate total count for display
-        total = sum(len(v) for v in cached_db.values())
-        if progress_callback: progress_callback(total)
-        return cached_db, total
-
-    # Rebuild if no cache
+        # Calculate total count
+        total_in_cache = sum(len(v) for v in cached_db.values())
+        
+        if total_in_cache > 0:
+            if progress_callback: progress_callback(total_in_cache)
+            return cached_db, total_in_cache
+        else:
+            print("Cache found but empty. Forcing rebuild.")
+            # Fall through to rebuild logic
+    
+    # Rebuild if no cache or empty cache
     db = {"阿丹哥": {}, "開源": {}}
     total = 0 # Initialize here to prevent UnboundLocalError
     
