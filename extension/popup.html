@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Image Rec Grabber</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --bg: #f8fafc;
+            --text: #1f2937;
+        }
+
+        body {
+            width: 400px;
+            height: 600px;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: white;
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .logo {
+            font-weight: 800;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .actions {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .match-badge {
+            background: var(--success);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+        }
+
+        .comp {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .comp img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #eee;
+        }
+
+        .vs {
+            font-weight: bold;
+            color: #cbd5e1;
+            font-size: 0.8rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            display: none;
+        }
+
+        .error {
+            color: #ef4444;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="logo">✨ Image Rec</div>
+        <div id="status" style="font-size:0.8rem; color:#64748b">Ready</div>
+    </div>
+
+    <div class="content">
+        <div class="actions">
+            <p style="font-size:0.9rem; color:#64748b; margin-bottom:1rem;">
+                Click "Activate", then click any table on the page to capture images.
+            </p>
+            <button id="activate_btn" class="btn">🎯 Activate Picker</button>
+        </div>
+
+        <div id="loader" class="loading">
+            Analyzing...
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

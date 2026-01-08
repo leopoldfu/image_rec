@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from flask.json.provider import DefaultJSONProvider
+from flask_cors import CORS
 import logic
 import os
 import threading
@@ -7,6 +8,7 @@ import numpy as np
 import json
 
 app = Flask(__name__)
+CORS(app) # Enable CORS for all routes (dev mode)
 
 # --- Fix JSON Serialization for Numpy ---
 class NumpyJSONProvider(DefaultJSONProvider):
