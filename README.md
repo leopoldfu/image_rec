@@ -64,3 +64,22 @@ Visit `http://localhost:8080`.
 ### Database Management
 - **Load**: Click "Load Database" on the dashboard.
 - **Add**: Use the `/archive` endpoint to upload new reference images to GCS. They are automatically added to the live RAM index.
+
+## 3. Chrome Extension Usage
+
+The **Image Rec Grabber** extension allows you to grab images directly from external websites for analysis.
+
+1.  **Install**: Load the `extension/` folder in `chrome://extensions` (Developer Mode).
+2.  **Activate**:
+    - Go to the website you want to scan.
+    - Click the **Extension Icon** (Magnifying Glass).
+    - Click **"🎯 Activate Picker"**.
+3.  **Capture**:
+    - Your cursor will turn into a `crosshair`.
+    - **Click on a Table Cell**: Captures all images in that specific column (downwards).
+    - **Click on an Image**: Captures just that image (or all images with the same class).
+4.  **Analyze**:
+    - You will see an alert: "✅ Captured X images!".
+    - **Open the Extension Icon again**.
+    - The extension will automatically send the URLs to your local server and display the matches.
+

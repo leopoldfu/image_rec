@@ -82,38 +82,42 @@ def analyze():
     if not DB_LOADED:
         return jsonify({"error": "Database not loaded. Please load database first."}), 503
 
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-    
-    files = request.files.getlist('file')
-    if not files:
-        return jsonify({"error": "No selected file"}), 400
+    if not DB_LOADED:
+        return jsonify({"error": "Database not loaded. Please load database first."}), 500
 
-    # Reload ignore pairs just in case
+    has_files = 'file' in request.files
+    has_urls = 'urls' in request.form
+    
+    if not has_files and not has_urls:
+         return jsonify({"error": "No file or URLs provided"}), 400
+    
+    # Reload ignore pairs (Available for both flows)
     ignores = logic.load_ignore_pairs()
     
     results = []
     
-    for file in files:
-        if file.filename == '': continue
+    # Process Files
+    if has_files:
+        files = request.files.getlist('file')
         
-        img_bytes = file.read()
-        try:
-            res = logic.check_image_engine(img_bytes, DATABASE, DEFAULT_CFG, ignores)
-            
-            # Add filename to result for frontend mapping
-            if res:
-                res["filename"] = file.filename
-                results.append(res)
-            else:
-                results.append({"filename": file.filename, "error": "Processing failed", "matches": []})
-        except Exception as e:
-            results.append({"filename": file.filename, "error": str(e), "matches": []})
+        for file in files:
+            if file.filename == '': continue
+            img_bytes = file.read()
+            try:
+                res = logic.check_image_engine(img_bytes, DATABASE, DEFAULT_CFG, ignores)
+                if res:
+                    res["filename"] = file.filename
+                    results.append(res)
+                else:
+                    results.append({"filename": file.filename, "error": "Processing failed", "matches": []})
+            except Exception as e:
+                results.append({"filename": file.filename, "error": str(e), "matches": []})
     
     # Handle URLs
     urls = request.form.get('urls', '')
     if urls:
-        import requests # Import here to avoid top-level dependency if preferred, or move up. Moving up is better style but this is safer for diff.
+        import requests 
+        import base64
         for url in urls.split('\n'):
             url = url.strip()
             if not url: continue
@@ -122,14 +126,26 @@ def analyze():
                 resp = requests.get(url, timeout=10)
                 if resp.status_code == 200:
                     img_bytes = resp.content
+                    
+                    # Prepare Base64 Thumbnail (Always available if download works)
+                    b64_img = base64.b64encode(img_bytes).decode('utf-8')
+                    thumbnail = f"data:image/jpeg;base64,{b64_img}"
+                    
                     res = logic.check_image_engine(img_bytes, DATABASE, DEFAULT_CFG, ignores)
                     
                     if res:
                         res["filename"] = url
                         res["is_url"] = True
+                        res["thumbnail"] = thumbnail
                         results.append(res)
                     else:
-                        results.append({"filename": url, "error": "Processing failed", "matches": []})
+                        # Even if no result/error in logic, return 'Unique' with thumbnail
+                        results.append({
+                            "filename": url, 
+                            "is_url": True,
+                            "thumbnail": thumbnail,
+                            "matches": [] # Empty matches = Unique
+                        })
                 else:
                      results.append({"filename": url, "error": f"Download failed: {resp.status_code}", "matches": []})
             except Exception as e:
