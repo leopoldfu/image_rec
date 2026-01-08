@@ -83,3 +83,16 @@ The **Image Rec Grabber** extension allows you to grab images directly from exte
     - **Open the Extension Icon again**.
     - The extension will automatically send the URLs to your local server and display the matches.
 
+### Packaging & Distribution
+To share this extension with others:
+1.  **Zip Method (Recommended)**:
+    - Right-click the `extension/` folder and select **Compress** (or Zip).
+    - Send the `.zip` file to your team.
+    - They just need to unzip it and use **"Load Unpacked"** in `chrome://extensions`.
+2.  **Chrome Store**:
+    - Upload the `.zip` file to the Chrome Web Store Developer Dashboard if you want to publish it officially.
+3.  **Pack Extension (.crx)**:
+    - Go to `chrome://extensions`, click **"Pack Extension"**.
+    - Select the `extension/` directory.
+    - This creates a `.crx` file, but Chrome often blocks manual installation of `.crx` files for security. The **Zip Method** is usually preferred for private tools.
+

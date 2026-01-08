@@ -263,22 +263,57 @@ def is_sparse_image(img_cv):
 # 2. Database & Engine
 # ==========================================
 
-def load_database(progress_callback=None):
-    db = {"阿丹哥": {}, "開源": {}}
-    from google.cloud import storage
-    
-    BUCKET_NAME = "image_rec_resource"
-    try:
-        # Try anonymous first
-        client = storage.Client.create_anonymous_client() 
-    except:
-        try:
-           client = storage.Client()
-        except:
-           print("Failed to initialize GCS client")
-           return db, 0
+CACHE_FILE = "index_cache.pkl"
+BUCKET_NAME = "image_rec_resource"
 
+def get_gcs_client():
     try:
+        return storage.Client()
+    except:
+        return storage.Client.create_anonymous_client()
+
+def save_index_cache(db):
+    try:
+        client = get_gcs_client()
+        bucket = client.bucket(BUCKET_NAME)
+        blob = bucket.blob(CACHE_FILE)
+        
+        # Serialize and upload
+        data = pickle.dumps(db)
+        blob.upload_from_string(data)
+        print("Index cache saved to GCS.")
+    except Exception as e:
+        print(f"Failed to save cache: {e}")
+
+def load_index_cache():
+    try:
+        client = get_gcs_client()
+        bucket = client.bucket(BUCKET_NAME)
+        blob = bucket.blob(CACHE_FILE)
+        
+        if blob.exists():
+            data = blob.download_as_string()
+            db = pickle.loads(data)
+            print("Index cache loaded from GCS.")
+            return db
+    except Exception as e:
+        print(f"Failed to load cache: {e}")
+    return None
+
+def load_database(progress_callback=None):
+    # Try Cache First
+    cached_db = load_index_cache()
+    if cached_db:
+        # Calculate total count for display
+        total = sum(len(v) for v in cached_db.values())
+        if progress_callback: progress_callback(total)
+        return cached_db, total
+
+    # Rebuild if no cache
+    db = {"阿丹哥": {}, "開源": {}}
+    
+    try:
+        client = get_gcs_client()
         bucket = client.bucket(BUCKET_NAME)
         prefixes = ["阿丹哥/", "開源/"]
         
@@ -310,6 +345,10 @@ def load_database(progress_callback=None):
                             
                     except Exception as e:
                         pass
+        
+        # Save cache after rebuild
+        save_index_cache(db)
+        
     except Exception as e:
         print(f"GCS Setup Error: {e}")
         
