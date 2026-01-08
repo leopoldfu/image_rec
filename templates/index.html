@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Rec | Smart Analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .preview-img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-wrapper">
+        <header class="app-header">
+            <div class="logo">✨ Image Rec</div>
+            <div class="status-badge" id="backend_status">
+                <span class="dot" id="status_dot"></span>
+                <span id="status_text">Offline</span>
+            </div>
+        </header>
+
+        <div class="glass-card">
+            <div class="hero-section">
+                <h1 class="hero-title">Visual Intelligence</h1>
+                <p class="hero-subtitle">Upload images or URLs to instantly scan against the archive.</p>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-num" id="db_count">0</span>
+                    <span class="stat-label">Images Indexed</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num">GCS</span>
+                    <span class="stat-label">Cloud Storage</span>
+                </div>
+            </div>
+
+            <!-- Load Area -->
+            <div id="load_section" style="padding: 3rem; text-align: center; display:none;">
+                <p style="color:var(--text-muted); margin-bottom:1.5rem;">Database index is required for analysis.</p>
+                <button class="btn-primary" onclick="triggerLoadDb()" style="max-width:300px; margin:0 auto;">
+                    🔄 Build Index
+                </button>
+                <div id="loader"
+                    style="margin-top:1.5rem; display:none; color: var(--secondary-color); font-weight:600;">
+                    ⏳ Building Index... (<span id="load_count_live">0</span>)
+                </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div id="upload_section" class="upload-container" style="display:none;">
+                <form id="analyze_form">
+                    <div class="drop-zone" id="drop_zone">
+                        <input type="file" name="file" id="file" accept="image/*" multiple
+                            onchange="handleFileSelect(this)">
+
+                        <div class="drop-content" id="drop_content">
+                            <span class="icon-large">☁️</span>
+                            <h3 style="margin:0; font-size:1.2rem; color:var(--text-main);">Drag & Drop Images</h3>
+                            <p style="color:var(--text-muted); margin-top:0.5rem;">Batch analysis supported</p>
+                        </div>
+
+                        <div id="preview_grid"
+                            style="display:none; gap:1rem; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); margin-top:1rem;">
+                        </div>
+                        <div id="file_count" style="margin-top:0.5rem; font-weight:600; color:var(--primary-color);">
+                        </div>
+                    </div>
+
+                    <textarea name="urls" id="url_input" placeholder="Or paste image URLs here (one per line)..."
+                        rows="3"></textarea>
+
+                    <div id="progress_container" class="progress-container">
+                        <div class="progress-track">
+                            <div id="progress_bar" class="progress-fill"></div>
+                        </div>
+                        <p id="progress_text"
+                            style="text-align:center; font-size:0.9rem; color:var(--text-muted); margin-top:0.5rem;">
+                            Analyzing...</p>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="analyze_btn">
+                        🚀 Start Analysis
+                    </button>
+                </form>
+            </div>
+
+            <!-- Grid Result Area -->
+            <div id="result_section" class="result-section">
+                <!-- Grid Container for Multiple Results -->
+                <div id="match_grid" style="display:grid; grid-template-columns: 1fr; gap:2rem;"></div>
+
+                <button onclick="toggleDetails()" class="details-toggle">View Batch JSON Details</button>
+                <div id="tech_details" class="tech-details"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- State ---
+        const els = {
+            statusBadge: document.getElementById('backend_status'),
+            statusDot: document.getElementById('status_dot'),
+            statusText: document.getElementById('status_text'),
+            dbCount: document.getElementById('db_count'),
+            loadSection: document.getElementById('load_section'),
+            uploadSection: document.getElementById('upload_section'),
+            loader: document.getElementById('loader'),
+            loadCount: document.getElementById('load_count_live'),
+
+            dropZone: document.getElementById('drop_zone'),
+            fileInput: document.getElementById('file'),
+            dropContent: document.getElementById('drop_content'),
+            previewGrid: document.getElementById('preview_grid'),
+            fileCount: document.getElementById('file_count'),
+            urlInput: document.getElementById('url_input'),
+
+            form: document.getElementById('analyze_form'),
+            progressContainer: document.getElementById('progress_container'),
+            progressBar: document.getElementById('progress_bar'),
+            progressText: document.getElementById('progress_text'),
+            btn: document.getElementById('analyze_btn'),
+
+            resultSection: document.getElementById('result_section'),
+            matchGrid: document.getElementById('match_grid'),
+            techDetails: document.getElementById('tech_details')
+        };
+
+        let fileMap = {};
+
+        // --- Polling ---
+        function checkStatus() {
+            fetch('/status')
+                .then(r => r.json())
+                .then(data => {
+                    els.dbCount.innerText = data.count;
+                    if (data.loading) {
+                        els.loader.style.display = 'block';
+                        els.loadCount.innerText = data.count;
+                        setTimeout(checkStatus, 500);
+                    } else {
+                        els.loader.style.display = 'none';
+                        setTimeout(checkStatus, 5000);
+                    }
+
+                    if (data.loaded) {
+                        els.statusText.innerText = "Online";
+                        els.statusDot.className = "dot active";
+                        els.loadSection.style.display = 'none';
+                        els.uploadSection.style.display = 'block';
+                    } else {
+                        els.statusText.innerText = data.loading ? "Building..." : "Offline";
+                        els.statusDot.className = data.loading ? "dot loading" : "dot";
+                        els.loadSection.style.display = 'block';
+                        els.uploadSection.style.display = 'none';
+                    }
+                })
+                .catch(e => setTimeout(checkStatus, 2000));
+        }
+
+        function triggerLoadDb() {
+            fetch('/load_db', { method: 'POST' }).then(() => checkStatus());
+        }
+
+        // --- Visuals ---
+        function handleFileSelect(input) {
+            const files = input.files;
+            if (files && files.length > 0) {
+                els.dropContent.style.display = 'none';
+                els.previewGrid.style.display = 'grid';
+                els.previewGrid.innerHTML = '';
+                els.fileCount.innerText = `${files.length} file(s) selected`;
+                fileMap = {}; // Reset map
+
+                Array.from(files).forEach(f => {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        fileMap[f.name] = e.target.result;
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'preview-img';
+                        els.previewGrid.appendChild(img);
+                    }
+                    reader.readAsDataURL(f);
+                });
+            }
+        }
+
+        // --- Analysis ---
+        els.form.onsubmit = function (e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+
+            // Check if anything is entered
+            const hasFile = els.fileInput.files.length > 0;
+            const hasUrl = els.urlInput.value.trim().length > 0;
+
+            if (!hasFile && !hasUrl) {
+                alert("Please select a file or enter a URL.");
+                return;
+            }
+
+            const xhr = new XMLHttpRequest();
+
+            // Reset UI
+            els.resultSection.style.display = 'none';
+            els.btn.style.display = 'none';
+            els.progressContainer.style.display = 'block';
+            els.progressBar.style.width = '0%';
+            els.progressBar.classList.remove('pulse-anim');
+            els.progressText.innerText = "Processing Inputs...";
+
+            xhr.open('POST', '/analyze', true);
+
+            xhr.upload.onprogress = function (e) {
+                if (e.lengthComputable) {
+                    const pct = (e.loaded / e.total) * 100;
+                    els.progressBar.style.width = pct + '%';
+                    if (pct >= 100) {
+                        els.progressText.innerText = "Downloading & Scanning...";
+                        els.progressBar.classList.add('pulse-anim');
+                    }
+                }
+            };
+
+            xhr.onload = function () {
+                els.progressContainer.style.display = 'none';
+                els.btn.style.display = 'block';
+
+                if (this.status === 200) {
+                    const data = JSON.parse(this.response);
+                    renderBatchResult(data);
+                } else if (this.status === 400) {
+                    alert("Input Error: " + JSON.parse(this.response).error);
+                } else {
+                    alert("Error: " + this.statusText);
+                }
+            };
+            xhr.send(fd);
+        };
+
+        function renderBatchResult(results) {
+            els.resultSection.style.display = 'block';
+            els.techDetails.innerText = JSON.stringify(results, null, 2);
+            els.matchGrid.innerHTML = '';
+
+            results.forEach(res => {
+                const match = res.matches && res.matches.length > 0 ? res.matches[0] : null;
+                // If it's a URL, use the filename (URL) as the source, otherwise look up the dataURL
+                const userImgSrc = res.is_url ? res.filename : (fileMap[res.filename] || "");
+
+                const card = document.createElement('div');
+                card.className = 'match-card'; // Reuse style
+
+                // Truncate long URL filenames for display
+                const dispName = res.filename.length > 50 ? res.filename.substring(0, 47) + "..." : res.filename;
+
+                if (res.error) {
+                    card.innerHTML = `
+                         <div style="border-bottom:1px solid var(--border-color); padding-bottom:1rem; margin-bottom:1rem;">
+                             <strong>❌ ${dispName}</strong>
+                         </div>
+                        <div style="text-align:center; padding:1rem; color:var(--accent-color);">
+                            ${res.error}
+                        </div>
+                     `;
+                } else if (match) {
+                    let scoreText = match.score;
+                    let matchType = match.type || "Match";
+
+                    card.innerHTML = `
+                        <div style="border-bottom:1px solid var(--border-color); padding-bottom:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+                            <strong title="${res.filename}">📄 ${dispName}</strong>
+                        </div>
+                        <div class="match-header">
+                            <div class="score-badge">✅ ${scoreText} Match</div>
+                            <p style="color:var(--text-muted); margin-top:0.5rem;">Found via ${matchType}</p>
+                        </div>
+                        <div class="comparison-view">
+                            <div class="comp-img-box">
+                                <img src="${userImgSrc}" class="comp-img" onerror="this.src='https://placehold.co/200x200?text=Invalid+Image'">
+                                <span class="comp-label">Your Input</span>
+                            </div>
+                            <div class="vs-badge">VS</div>
+                            <div class="comp-img-box">
+                                 <a href="${match.path}" target="_blank">
+                                    <img src="${match.path}" class="comp-img">
+                                 </a>
+                                <span class="comp-label">Database Match</span>
+                            </div>
+                        </div>
+                        <p style="text-align:center; margin-top:1rem; font-weight:500;">
+                            Client: <span style="color:var(--primary-color)">${match.client}</span>
+                        </p>
+                    `;
+                } else {
+                    card.innerHTML = `
+                         <div style="border-bottom:1px solid var(--border-color); padding-bottom:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+                             <strong title="${res.filename}">📄 ${dispName}</strong>
+                         </div>
+                        <div style="text-align:center; padding:1rem;">
+                            <div style="font-size:3rem; margin-bottom:0.5rem;">🎉</div>
+                            <h3 style="color:var(--success-color);">No Match Found</h3>
+                            <p style="color:var(--text-muted);">Unique image.</p>
+                            <img src="${userImgSrc}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; margin-top:1rem; box-shadow:0 2px 5px rgba(0,0,0,0.1);" onerror="this.style.display='none'">
+                        </div>
+                     `;
+                }
+                els.matchGrid.appendChild(card);
+            });
+        }
+
+        function toggleDetails() {
+            const d = els.techDetails;
+            d.style.display = d.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // --- Init ---
+        checkStatus();
+
+        // Drag handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            els.dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+        ['dragenter', 'dragover'].forEach(name => els.dropZone.classList.add('drag-over'));
+        ['dragleave', 'drop'].forEach(name => els.dropZone.classList.remove('drag-over'));
+
+        els.dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt.files.length) {
+                els.fileInput.files = dt.files;
+                handleFileSelect(els.fileInput); // Handles multiple
+            }
+        });
+    </script>
+</body>
+
+</html>
