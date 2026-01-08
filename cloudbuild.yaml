@@ -1,0 +1,38 @@
+steps:
+  # 1. Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'build', 
+        '-t', 'asia-east1-docker.pkg.dev/popinpoc1/cloud-run-source-deploy/image-rec:$COMMIT_SHA', 
+        '.'
+      ]
+
+  # 2. Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'push', 
+        'asia-east1-docker.pkg.dev/popinpoc1/cloud-run-source-deploy/image-rec:$COMMIT_SHA'
+      ]
+
+  # 3. Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      [
+        'run', 'deploy', 'image-rec',
+        '--image=asia-east1-docker.pkg.dev/popinpoc1/cloud-run-source-deploy/image-rec:$COMMIT_SHA',
+        '--region=asia-east1',
+        '--platform=managed',
+        '--allow-unauthenticated',
+        '--port=8080',
+        '--service-account=439393162392-compute@developer.gserviceaccount.com',
+        '--set-env-vars=SERVICE_NAME=image-rec'
+      ]
+
+images:
+  - 'asia-east1-docker.pkg.dev/popinpoc1/cloud-run-source-deploy/image-rec:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
