@@ -311,13 +311,13 @@ def load_database(progress_callback=None):
 
     # Rebuild if no cache
     db = {"阿丹哥": {}, "開源": {}}
+    total = 0 # Initialize here to prevent UnboundLocalError
     
     try:
         client = get_gcs_client()
         bucket = client.bucket(BUCKET_NAME)
         prefixes = ["阿丹哥/", "開源/"]
         
-        total = 0
         for prefix in prefixes:
             blobs = bucket.list_blobs(prefix=prefix)
             client_name = prefix.strip("/")
@@ -480,10 +480,11 @@ def check_image_engine(image_input, database, cfg, ignore_pairs):
         print(e)
         return None
 
-def add_db(img_bytes, client):
+def add_db(database, client, filename, img_bytes):
     from google.cloud import storage
     BUCKET_NAME = "image_rec_resource"
     
+    # Generate unique name
     n = f"{client}/{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}.png"
     
     try:
@@ -491,7 +492,7 @@ def add_db(img_bytes, client):
            storage_client = storage.Client()
         except:
            print("Cannot get storage client for upload")
-           return None
+           return None, None
 
         bucket = storage_client.bucket(BUCKET_NAME)
         blob = bucket.blob(n)
@@ -508,6 +509,11 @@ def add_db(img_bytes, client):
         blob.upload_from_file(buf, content_type='image/png')
         
         public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{n}"
+        
+        # Update RAM Database!
+        if client not in database: database[client] = {}
+        database[client][public_url] = sig
+        
         return public_url, sig
     except Exception as e:
         print(f"Upload failed: {e}")
