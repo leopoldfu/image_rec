@@ -7,10 +7,12 @@ import numpy as np
 import imagehash
 from PIL import Image, ImageOps, ImageFile
 from datetime import datetime
+import uuid
+import requests
 import urllib.parse
 import io
 import pickle
-from google.cloud import storage # Fix NameError
+from google.cloud import storage
 
 # Allow loading truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
