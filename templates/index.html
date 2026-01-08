@@ -153,10 +153,10 @@
                     if (data.loading) {
                         els.loader.style.display = 'block';
                         els.loadCount.innerText = data.count;
-                        setTimeout(checkStatus, 500);
+                        setTimeout(checkStatus, 2000); // Check every 2s
                     } else {
                         els.loader.style.display = 'none';
-                        setTimeout(checkStatus, 5000);
+                        setTimeout(checkStatus, 10000); // Check every 10s when idle
                     }
 
                     if (data.loaded) {
@@ -171,7 +171,7 @@
                         els.uploadSection.style.display = 'none';
                     }
                 })
-                .catch(e => setTimeout(checkStatus, 2000));
+                .catch(e => setTimeout(checkStatus, 5000)); // Retry every 5s on error
         }
 
         function triggerLoadDb() {
